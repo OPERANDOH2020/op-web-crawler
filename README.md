@@ -7,5 +7,6 @@ Similarly, Web Crawler browses the pages where OSPs share their privacy policy a
 Web Crawler runs on Python 2.7 and uses:
 * [flask](http://flask.pocoo.org/)
 * [selenium](http://www.seleniumhq.org/)
+* [phantomjs](http://phantomjs.org/)
 
 The credentials for each dummy account are stored in a configuration file (credentials.ini), so make the according changes to have this up and running.

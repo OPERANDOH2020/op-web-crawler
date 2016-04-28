@@ -1,24 +1,28 @@
-# Copyright (c) 2016 {UPRC}.
-# All rights reserved. This program and the accompanying materials
-# are made available under the terms of the The MIT License (MIT).
-# which accompanies this distribution, and is available at
-# http://opensource.org/licenses/MIT
-# Contributors:
-# {Constantinos Patsakis} {UPRC}
-# Initially developed in the context of OPERANDO EU project www.operando.eu
-
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import time
+from time import sleep
 import ConfigParser
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from flask import Flask
+import atexit
+import json
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
+user_agent = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/49.0.2623.108 Chrome/49.0.2623.108 Safari/537.36")
+
+dcap = dict(DesiredCapabilities.PHANTOMJS)
+dcap["phantomjs.page.settings.userAgent"] = user_agent
+driver = webdriver.PhantomJS(desired_capabilities=dcap)
+
 app = Flask(__name__)
-driver = webdriver.Firefox()
+
 Config = ConfigParser.ConfigParser()
 Config.read("credentials.ini")
+
+def bye():
+    driver.quit()
 
 def save2file(name, content):
     fout = open(name, "w")
@@ -34,7 +38,7 @@ def linkedin(driver, uname, pwd):
     emailelement.send_keys(uname)
     passwordelement.send_keys(pwd)
     passwordelement.submit()
-    time.sleep(2)
+    sleep(2)
     driver.get("https://www.linkedin.com/psettings/")
     settings = driver.find_element_by_xpath(
         "//div[contains(@class, 'settings-grid')]").text
@@ -85,31 +89,69 @@ def google(driver, uname, pwd):
     driver.find_element_by_id("Email").send_keys(uname)
     driver.find_element_by_id("next").click()
     # needs to sleep otherwise it will not find the element
-    time.sleep(1)
+    sleep(1)
     driver.find_element_by_id("Passwd").send_keys(pwd)
     driver.find_element_by_id("signIn").click()
 
-    # get the privacy settings page
+    # get the privacy page
     driver.get("https://myaccount.google.com/privacy?pli=1")
     settings = driver.find_element_by_xpath("//div[contains(@class, 'lc-mc')]")
     return settings.text
 
+def googlePT(driver):
+    url = 'https://www.google.com/policies/privacy/'
+    driver.get(url)
+    terms = driver.find_element_by_xpath("//div[contains(@class, 'maia-article')]").text
+    return terms
 
-@app.route("/")
-def get_privacy_seetings():
-	f_res = fb(driver, Config.get("facebook", "user"),
-	           Config.get("facebook", "password"))
-	g_res = google(driver, Config.get("google", "user"),
-	               Config.get("google", "password"))
-	t_res = twitter(driver, Config.get("twitter", "user"),
-        Config.get("twitter", "password"))
-	l_res = linkedin(driver, Config.get("linkedin", "user"),
-         Config.get("linkedin", "password"))
-	ret_value="{1:'"+f_res+"',"
-	ret_value+="2:'"+g_res+"',"
-	ret_value+="3:'"+t_res+"',"
-	ret_value+="4:'"+l_res+"'}"
-	return ret_value
+def InstagramPT(driver):
+    url = 'http://instagram.com/legal/privacy/'
+    driver.get(url)
+    terms = driver.find_element_by_id('hc2content').text
+    return terms
+
+def TwitterPT(driver):
+    url = 'https://twitter.com/privacy?lang=en'
+    driver.get(url)
+    terms = driver.find_element_by_xpath("//div[contains(@class, 'UserPolicy-content')]").text
+    return terms
+
+def LinkedInPT(driver):
+    url = 'https://www.linkedin.com/legal/privacy-policy'
+    driver.get(url)
+    terms = driver.find_element_by_xpath("//div[contains(@class, 'legal')]").text
+    return terms
+
+def FBPT(driver):
+    url = 'https://www.facebook.com/legal/terms/update'
+    driver.get(url)
+    terms = driver.find_element_by_id('content').text
+    return terms
+
+
+@app.route("/GetPrivacyTerms", methods=['GET'])
+def GetPrivacyTerms():
+    res = {}
+    res['fb'] = FBPT(driver)
+    res['g'] = googlePT(driver)
+    res['tw'] = TwitterPT(driver)
+    res['l'] = LinkedInPT(driver)
+    res['i'] = InstagramPT(driver)
+
+    json_data = json.dumps(res)
+    return str(json_data)
+
+@app.route("/OSPSettings", methods=['GET'])
+def GetGlobalSettings():
+    res={}
+    res['fb'] = fb(driver, Config.get("facebook", "user"),Config.get("facebook", "password"))
+    res['g'] = google(driver, Config.get("google", "user"),Config.get("google", "password"))
+    res['tw'] = twitter(driver, Config.get("twitter", "user"),Config.get("twitter", "password"))
+    res['l'] = linkedin(driver, Config.get("linkedin", "user"),Config.get("linkedin", "password"))
+
+    json_data = json.dumps(res)
+    return str(json_data)
 
 if __name__ == "__main__":
-	app.run(debug=True)
+    app.run(debug=True)
+    atexit.register(bye)
